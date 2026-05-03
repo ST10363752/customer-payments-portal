@@ -1,4 +1,4 @@
- // server/index.js - Complete Secure Backend
+// server/index.js - Complete Secure Backend with Fixed CORS
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -13,11 +13,32 @@ const { body, validationResult } = require('express-validator');
 const app = express();
 
 // ========== SECURITY MIDDLEWARE ==========
-app.use(helmet()); // Protects against XSS, clickjacking, etc.
+app.use(helmet());
+
+// ========== CORS CONFIGURATION - FIXED FOR NETLIFY ==========
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'https://tangerine-cranachan-d3bf75.netlify.app',
+    'https://classy-cactus-b989db.netlify.app',
+    'https://mellow-condol-2fb19d.netlify.app'
+];
+
 app.use(cors({
-    origin: 'http://localhost:5173', // React dev server
-    credentials: true
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -25,7 +46,9 @@ app.use(cookieParser());
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // 100 requests per window
-    message: 'Too many requests, please try again later.'
+    message: 'Too many requests, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
@@ -33,7 +56,9 @@ app.use('/api/', limiter);
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5, // Only 5 login attempts per 15 minutes
-    message: 'Too many login attempts, please try again later.'
+    message: 'Too many login attempts, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
 // ========== REGEX WHITELISTING PATTERNS ==========
@@ -48,7 +73,6 @@ const patterns = {
 };
 
 // ========== MONGODB CONNECTION ==========
-// You'll add your MongoDB URI here later - for now, we'll use a local fallback
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/portal_db';
 
 mongoose.connect(MONGODB_URI)
@@ -61,7 +85,7 @@ const userSchema = new mongoose.Schema({
     idNumber: { type: String, required: true, unique: true },
     accountNumber: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    balance: { type: Number, default: 10000 }, // Starting balance for demo
+    balance: { type: Number, default: 10000 },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -73,7 +97,7 @@ const paymentSchema = new mongoose.Schema({
     swiftCode: { type: String, required: true },
     amount: { type: Number, required: true },
     currency: { type: String, required: true, default: 'USD' },
-    status: { type: String, default: 'pending' },
+    status: { type: String, default: 'completed' },
     reference: { type: String },
     createdAt: { type: Date, default: Date.now }
 });
@@ -112,7 +136,6 @@ app.post('/api/register',
     body('accountNumber').matches(patterns.accountNumber).withMessage('Account number must be 6-15 digits'),
     body('password').matches(patterns.password).withMessage('Password must have at least 8 characters, 1 uppercase, 1 lowercase, 1 number, and 1 special character'),
     async (req, res) => {
-        // Check validation errors
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
@@ -121,7 +144,6 @@ app.post('/api/register',
         const { fullName, idNumber, accountNumber, password } = req.body;
         
         try {
-            // Check if user already exists
             const existingUser = await User.findOne({ 
                 $or: [{ idNumber }, { accountNumber }] 
             });
@@ -130,7 +152,6 @@ app.post('/api/register',
                 return res.status(400).json({ error: 'User with this ID or account number already exists' });
             }
             
-            // Hash password (bcrypt automatically adds salt)
             const hashedPassword = await bcrypt.hash(password, 12);
             
             const user = new User({
@@ -142,13 +163,12 @@ app.post('/api/register',
             
             await user.save();
             
-            // Generate token and set cookie
             const token = generateToken(user._id);
             res.cookie('token', token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 24 * 60 * 60 * 1000 // 24 hours
+                secure: true,
+                sameSite: 'none',
+                maxAge: 24 * 60 * 60 * 1000
             });
             
             res.status(201).json({ 
@@ -192,8 +212,8 @@ app.post('/api/login',
             const token = generateToken(user._id);
             res.cookie('token', token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                secure: true,
+                sameSite: 'none',
                 maxAge: 24 * 60 * 60 * 1000
             });
             
@@ -211,7 +231,11 @@ app.post('/api/login',
 
 // ========== LOGOUT API ==========
 app.post('/api/logout', (req, res) => {
-    res.clearCookie('token');
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
+    });
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -268,11 +292,9 @@ app.post('/api/payment',
                 return res.status(400).json({ error: 'Insufficient balance' });
             }
             
-            // Deduct balance
             user.balance -= paymentAmount;
             await user.save();
             
-            // Create payment record
             const payment = new Payment({
                 userId: req.userId,
                 recipientName,

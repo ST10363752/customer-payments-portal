@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Portal from './pages/Portal';
+import api from './api';
 import './App.css';
-
-// Configure axios to send cookies with requests
-axios.defaults.withCredentials = true;
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -15,10 +12,9 @@ function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check if user is logged in
     const checkAuth = async () => {
       try {
-        const response = await axios.get('/api/me');
+        const response = await api.get('/me');
         if (response.data.user) {
           setIsAuthenticated(true);
           setUser(response.data.user);
@@ -40,7 +36,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('/api/logout');
+      await api.post('/logout');
       setIsAuthenticated(false);
       setUser(null);
     } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const Dashboard = ({ user }) => {
   const [balance, setBalance] = useState(null);
@@ -8,7 +8,7 @@ const Dashboard = ({ user }) => {
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        const response = await axios.get('/api/balance');
+        const response = await api.get('/balance');
         setBalance(response.data);
       } catch (error) {
         console.error('Balance fetch error:', error);

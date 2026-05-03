@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import api from '../api';
 
 const MakePayment = () => {
   const [formData, setFormData] = useState({
@@ -28,7 +28,7 @@ const MakePayment = () => {
     setError(null);
 
     try {
-      const response = await axios.post('/api/payment', formData);
+      const response = await api.post('/payment', formData);
       if (response.data.success) {
         setMessage({ type: 'success', text: `Payment of ${response.data.payment.amount} ${response.data.payment.currency} sent successfully! New balance: $${response.data.newBalance}` });
         setTimeout(() => navigate('/portal/history'), 2000);

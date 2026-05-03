@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const PaymentHistory = () => {
   const [payments, setPayments] = useState([]);
@@ -8,7 +8,7 @@ const PaymentHistory = () => {
   useEffect(() => {
     const fetchPayments = async () => {
       try {
-        const response = await axios.get('/api/payments');
+        const response = await api.get('/payments');
         setPayments(response.data.payments);
       } catch (error) {
         console.error('Fetch payments error:', error);

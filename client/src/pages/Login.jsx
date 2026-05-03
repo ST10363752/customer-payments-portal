@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api';
 
 const Login = ({ onLogin }) => {
   const [accountNumber, setAccountNumber] = useState('');
@@ -15,7 +15,7 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/login', { accountNumber, password });
+      const response = await api.post('/login', { accountNumber, password });
       if (response.data.success) {
         onLogin(response.data.user);
         navigate('/portal');

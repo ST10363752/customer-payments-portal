@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api';
 
 const Register = ({ onRegister }) => {
   const [formData, setFormData] = useState({
@@ -31,7 +31,7 @@ const Register = ({ onRegister }) => {
 
     try {
       const { confirmPassword, ...registerData } = formData;
-      const response = await axios.post('/api/register', registerData);
+      const response = await api.post('/register', registerData);
       if (response.data.success) {
         onRegister(response.data.user);
         navigate('/portal');
