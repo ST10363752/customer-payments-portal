@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import Portal from './pages/Portal';
 import api from './api';
 import './App.css';
@@ -9,19 +8,19 @@ import './App.css';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [employee, setEmployee] = useState(null);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const response = await api.get('/me');
-        if (response.data.user) {
+        if (response.data.employee) {
           setIsAuthenticated(true);
-          setUser(response.data.user);
+          setEmployee(response.data.employee);
         }
       } catch (error) {
         setIsAuthenticated(false);
-        setUser(null);
+        setEmployee(null);
       } finally {
         setLoading(false);
       }
@@ -29,16 +28,16 @@ function App() {
     checkAuth();
   }, []);
 
-  const handleLogin = (userData) => {
+  const handleLogin = (employeeData) => {
     setIsAuthenticated(true);
-    setUser(userData);
+    setEmployee(employeeData);
   };
 
   const handleLogout = async () => {
     try {
       await api.post('/logout');
       setIsAuthenticated(false);
-      setUser(null);
+      setEmployee(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -48,7 +47,7 @@ function App() {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
-        <p>Loading secure portal...</p>
+        <p>Loading secure employee portal...</p>
       </div>
     );
   }
@@ -62,12 +61,8 @@ function App() {
             element={!isAuthenticated ? <Login onLogin={handleLogin} /> : <Navigate to="/portal" />} 
           />
           <Route 
-            path="/register" 
-            element={!isAuthenticated ? <Register onRegister={handleLogin} /> : <Navigate to="/portal" />} 
-          />
-          <Route 
             path="/portal/*" 
-            element={isAuthenticated ? <Portal user={user} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+            element={isAuthenticated ? <Portal user={employee} onLogout={handleLogout} /> : <Navigate to="/login" />} 
           />
           <Route path="/" element={<Navigate to="/login" />} />
         </Routes>

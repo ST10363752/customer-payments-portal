@@ -22,6 +22,7 @@ const Dashboard = ({ user }) => {
   return (
     <div className="dashboard">
       <h1>Welcome, {user?.fullName}!</h1>
+      <p>Role: {user?.role} | Department: {user?.department || 'Finance'}</p>
       
       <div className="balance-card">
         <h3>Available Balance</h3>
@@ -32,7 +33,7 @@ const Dashboard = ({ user }) => {
             ${balance?.balance?.toLocaleString() || '0'}
           </div>
         )}
-        <p className="account-info">Account: {user?.accountNumber}</p>
+        <p className="account-info">Employee ID: {user?.employeeId}</p>
       </div>
       
       <div className="quick-actions">

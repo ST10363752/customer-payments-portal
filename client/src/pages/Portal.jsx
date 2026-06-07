@@ -17,7 +17,7 @@ const Portal = ({ user, onLogout }) => {
     <div className="portal-container">
       <nav className="portal-nav">
         <div className="nav-brand">
-          <h2>🌍 International Payments Portal</h2>
+          <h2>🏦 Employee International Payments Portal</h2>
         </div>
         <div className="nav-links">
           <Link to="/portal">Dashboard</Link>
@@ -25,7 +25,8 @@ const Portal = ({ user, onLogout }) => {
           <Link to="/portal/history">History</Link>
         </div>
         <div className="nav-user">
-          <span>Welcome, {user?.fullName?.split(' ')[0] || 'User'}</span>
+          <span>Welcome, {user?.fullName?.split(' ')[0] || 'Employee'}</span>
+          <span className="role-badge">{user?.role || 'Employee'}</span>
           <button onClick={handleLogout} className="logout-btn">Logout</button>
         </div>
       </nav>

@@ -1,4 +1,4 @@
-// server/index.js - Complete Secure Backend with Fixed CORS
+// server/index.js - Employee Portal (NO REGISTRATION) - FULL CORRECTED VERSION
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -9,30 +9,31 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
+const path = require('path');
 
 const app = express();
 
 // ========== SECURITY MIDDLEWARE ==========
 app.use(helmet());
 
-// ========== CORS CONFIGURATION - FIXED FOR NETLIFY ==========
+// ========== CORS CONFIGURATION ==========
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
-    'https://tangerine-cranachan-d3bf75.netlify.app',
-    'https://classy-cactus-b989db.netlify.app',
-    'https://mellow-condol-2fb19d.netlify.app'
+    'http://localhost:5000',
+    'https://tangerine-cranachan-d3bf75.netlify.app'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            return callback(null, true);
+        } else {
+            console.log('Blocked origin:', origin);
+            return callback(new Error('Not allowed by CORS'), false);
         }
-        return callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -42,30 +43,28 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// ========== RATE LIMITING (Protects against brute force) ==========
-const limiter = rateLimit({
+// ========== RATE LIMITING (Brute Force Protection) ==========
+const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
-    message: 'Too many requests, please try again later.',
+    max: 5, // 5 attempts only
+    message: 'Too many login attempts. Please try again in 15 minutes.',
     standardHeaders: true,
     legacyHeaders: false,
 });
-app.use('/api/', limiter);
 
-// Stricter limiter for login
-const loginLimiter = rateLimit({
+// General rate limiter for all API requests
+const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5, // Only 5 login attempts per 15 minutes
-    message: 'Too many login attempts, please try again later.',
+    max: 100,
+    message: 'Too many requests. Please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
 });
 
 // ========== REGEX WHITELISTING PATTERNS ==========
 const patterns = {
+    employeeId: /^EMP[0-9]{3}$/,  // EMP001, EMP002, etc.
     fullName: /^[A-Za-z\s'-]{2,50}$/,
-    idNumber: /^[0-9]{13}$/, // South African ID (13 digits)
-    accountNumber: /^[0-9]{6,15}$/, // 6-15 digits
     password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
     amount: /^[0-9]+(\.[0-9]{1,2})?$/,
     currency: /^[A-Z]{3}$/,
@@ -79,18 +78,19 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('✅ MongoDB connected successfully'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// ========== DATABASE SCHEMAS ==========
-const userSchema = new mongoose.Schema({
+// ========== EMPLOYEE SCHEMA (NO REGISTRATION - Pre-created employees only) ==========
+const employeeSchema = new mongoose.Schema({
     fullName: { type: String, required: true },
-    idNumber: { type: String, required: true, unique: true },
-    accountNumber: { type: String, required: true, unique: true },
+    employeeId: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    balance: { type: Number, default: 10000 },
+    role: { type: String, default: 'employee' },
+    department: { type: String },
+    balance: { type: Number, default: 50000 },
     createdAt: { type: Date, default: Date.now }
 });
 
 const paymentSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    employeeId: { type: String, required: true },
     recipientName: { type: String, required: true },
     recipientAccount: { type: String, required: true },
     recipientBank: { type: String, required: true },
@@ -102,91 +102,45 @@ const paymentSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-const User = mongoose.model('User', userSchema);
+const Employee = mongoose.model('Employee', employeeSchema);
 const Payment = mongoose.model('Payment', paymentSchema);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-this-in-production';
-const JWT_EXPIRY = '24h';
+const JWT_SECRET = process.env.JWT_SECRET || 'employee-portal-secret-key';
+const JWT_EXPIRY = '8h';
 
 // ========== HELPER FUNCTIONS ==========
-const generateToken = (userId) => {
-    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+const generateToken = (employeeId, role) => {
+    return jwt.sign({ employeeId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 };
 
 const verifyToken = (req, res, next) => {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     
     if (!token) {
-        return res.status(401).json({ error: 'Access denied. No token provided.' });
+        return res.status(401).json({ error: 'Access denied. Please login.' });
     }
     
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.userId = decoded.userId;
+        req.employeeId = decoded.employeeId;
+        req.role = decoded.role;
         next();
     } catch (error) {
-        return res.status(401).json({ error: 'Invalid or expired token.' });
+        return res.status(401).json({ error: 'Invalid or expired session. Please login again.' });
     }
 };
 
-// ========== REGISTER API ==========
-app.post('/api/register',
-    body('fullName').matches(patterns.fullName).withMessage('Invalid full name format'),
-    body('idNumber').matches(patterns.idNumber).withMessage('ID number must be 13 digits'),
-    body('accountNumber').matches(patterns.accountNumber).withMessage('Account number must be 6-15 digits'),
-    body('password').matches(patterns.password).withMessage('Password must have at least 8 characters, 1 uppercase, 1 lowercase, 1 number, and 1 special character'),
-    async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-        
-        const { fullName, idNumber, accountNumber, password } = req.body;
-        
-        try {
-            const existingUser = await User.findOne({ 
-                $or: [{ idNumber }, { accountNumber }] 
-            });
-            
-            if (existingUser) {
-                return res.status(400).json({ error: 'User with this ID or account number already exists' });
-            }
-            
-            const hashedPassword = await bcrypt.hash(password, 12);
-            
-            const user = new User({
-                fullName,
-                idNumber,
-                accountNumber,
-                password: hashedPassword
-            });
-            
-            await user.save();
-            
-            const token = generateToken(user._id);
-            res.cookie('token', token, {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                maxAge: 24 * 60 * 60 * 1000
-            });
-            
-            res.status(201).json({ 
-                success: true, 
-                message: 'Registration successful!',
-                user: { id: user._id, fullName: user.fullName, accountNumber: user.accountNumber, balance: user.balance }
-            });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ error: 'Registration failed. Please try again.' });
-        }
+const verifyAdmin = (req, res, next) => {
+    if (req.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
     }
-);
+    next();
+};
 
-// ========== LOGIN API ==========
+// ========== EMPLOYEE LOGIN API (NO REGISTRATION) ==========
 app.post('/api/login',
     loginLimiter,
-    body('accountNumber').matches(patterns.accountNumber).withMessage('Invalid account number format'),
+    body('employeeId').matches(patterns.employeeId).withMessage('Invalid Employee ID format (e.g., EMP001)'),
     body('password').notEmpty().withMessage('Password is required'),
     async (req, res) => {
         const errors = validationResult(req);
@@ -194,33 +148,39 @@ app.post('/api/login',
             return res.status(400).json({ errors: errors.array() });
         }
         
-        const { accountNumber, password } = req.body;
+        const { employeeId, password } = req.body;
         
         try {
-            const user = await User.findOne({ accountNumber });
+            const employee = await Employee.findOne({ employeeId });
             
-            if (!user) {
-                return res.status(401).json({ error: 'Invalid account number or password' });
+            if (!employee) {
+                return res.status(401).json({ error: 'Invalid Employee ID or password' });
             }
             
-            const isValidPassword = await bcrypt.compare(password, user.password);
+            const isValidPassword = await bcrypt.compare(password, employee.password);
             
             if (!isValidPassword) {
-                return res.status(401).json({ error: 'Invalid account number or password' });
+                return res.status(401).json({ error: 'Invalid Employee ID or password' });
             }
             
-            const token = generateToken(user._id);
+            const token = generateToken(employee.employeeId, employee.role);
             res.cookie('token', token, {
                 httpOnly: true,
                 secure: true,
                 sameSite: 'none',
-                maxAge: 24 * 60 * 60 * 1000
+                maxAge: 8 * 60 * 60 * 1000
             });
             
             res.json({ 
                 success: true, 
                 message: 'Login successful!',
-                user: { id: user._id, fullName: user.fullName, accountNumber: user.accountNumber, balance: user.balance }
+                employee: { 
+                    employeeId: employee.employeeId, 
+                    fullName: employee.fullName, 
+                    role: employee.role,
+                    department: employee.department,
+                    balance: employee.balance 
+                }
             });
         } catch (error) {
             console.error(error);
@@ -239,24 +199,27 @@ app.post('/api/logout', (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// ========== GET CURRENT USER ==========
+// ========== GET CURRENT EMPLOYEE ==========
 app.get('/api/me', verifyToken, async (req, res) => {
     try {
-        const user = await User.findById(req.userId).select('-password');
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        const employee = await Employee.findOne({ employeeId: req.employeeId }).select('-password');
+        if (!employee) {
+            return res.status(404).json({ error: 'Employee not found' });
         }
-        res.json({ user });
+        res.json({ employee });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 });
 
-// ========== GET USER BALANCE ==========
+// ========== GET EMPLOYEE BALANCE ==========
 app.get('/api/balance', verifyToken, async (req, res) => {
     try {
-        const user = await User.findById(req.userId).select('balance accountNumber');
-        res.json({ balance: user.balance, accountNumber: user.accountNumber });
+        const employee = await Employee.findOne({ employeeId: req.employeeId }).select('balance employeeId');
+        if (!employee) {
+            return res.status(404).json({ error: 'Employee not found' });
+        }
+        res.json({ balance: employee.balance, employeeId: employee.employeeId });
     } catch (error) {
         res.status(500).json({ error: 'Could not fetch balance' });
     }
@@ -266,12 +229,11 @@ app.get('/api/balance', verifyToken, async (req, res) => {
 app.post('/api/payment',
     verifyToken,
     body('recipientName').matches(/^[A-Za-z\s'-]{2,100}$/).withMessage('Invalid recipient name'),
-    body('recipientAccount').matches(patterns.accountNumber).withMessage('Invalid recipient account number'),
+    body('recipientAccount').matches(/^[0-9]{6,15}$/).withMessage('Invalid recipient account number'),
     body('recipientBank').matches(/^[A-Za-z\s]{2,100}$/).withMessage('Invalid bank name'),
     body('swiftCode').matches(patterns.swiftCode).withMessage('Invalid SWIFT/BIC code'),
     body('amount').matches(patterns.amount).withMessage('Invalid amount format'),
     body('currency').matches(patterns.currency).withMessage('Invalid currency code (3 letters)'),
-    body('reference').optional().isLength({ max: 100 }),
     async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -282,21 +244,21 @@ app.post('/api/payment',
         const paymentAmount = parseFloat(amount);
         
         try {
-            const user = await User.findById(req.userId);
+            const employee = await Employee.findOne({ employeeId: req.employeeId });
             
-            if (!user) {
-                return res.status(404).json({ error: 'User not found' });
+            if (!employee) {
+                return res.status(404).json({ error: 'Employee not found' });
             }
             
-            if (user.balance < paymentAmount) {
+            if (employee.balance < paymentAmount) {
                 return res.status(400).json({ error: 'Insufficient balance' });
             }
             
-            user.balance -= paymentAmount;
-            await user.save();
+            employee.balance -= paymentAmount;
+            await employee.save();
             
             const payment = new Payment({
-                userId: req.userId,
+                employeeId: req.employeeId,
                 recipientName,
                 recipientAccount,
                 recipientBank,
@@ -311,9 +273,9 @@ app.post('/api/payment',
             
             res.json({
                 success: true,
-                message: 'Payment processed successfully!',
+                message: 'International payment processed successfully!',
                 transactionId: payment._id,
-                newBalance: user.balance,
+                newBalance: employee.balance,
                 payment: {
                     amount: paymentAmount,
                     currency,
@@ -331,10 +293,20 @@ app.post('/api/payment',
 // ========== GET PAYMENT HISTORY ==========
 app.get('/api/payments', verifyToken, async (req, res) => {
     try {
-        const payments = await Payment.find({ userId: req.userId }).sort({ createdAt: -1 }).limit(20);
+        const payments = await Payment.find({ employeeId: req.employeeId }).sort({ createdAt: -1 }).limit(20);
         res.json({ payments });
     } catch (error) {
         res.status(500).json({ error: 'Could not fetch payment history' });
+    }
+});
+
+// ========== ADMIN ONLY: GET ALL EMPLOYEES ==========
+app.get('/api/employees', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const employees = await Employee.find({}).select('-password');
+        res.json({ employees });
+    } catch (error) {
+        res.status(500).json({ error: 'Could not fetch employees' });
     }
 });
 
@@ -346,6 +318,10 @@ app.get('/api/health', (req, res) => {
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Employee Portal Server running on http://localhost:${PORT}`);
     console.log(`📡 API available at http://localhost:${PORT}/api/health`);
+    console.log(`🔐 Employee login: EMP001, EMP002, EMP003`);
 });
+
+// Export for testing (optional)
+module.exports = app;
