@@ -22,13 +22,14 @@ jobs:
             cd client
             npm run build
       - run:
-          name: Install SonarScanner
+          name: Install SonarScanner in Server
           command: |
             cd server
             npm install sonarqube-scanner --save-dev
       - run:
           name: Run SonarQube Scan
           command: |
+            cd server
             node sonar-project.js
       - run:
           name: Security Audit

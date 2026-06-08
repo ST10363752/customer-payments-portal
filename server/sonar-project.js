@@ -7,7 +7,7 @@ scanner(
     options: {
       'sonar.projectKey': 'ST10363752_customer-payments-portal',
       'sonar.projectName': 'customer-payments-portal',
-      'sonar.sources': 'server',
+      'sonar.sources': '.',
       'sonar.exclusions': '**/node_modules/**,**/dist/**,**/build/**',
       'sonar.javascript.lcov.reportPaths': '',
     },
