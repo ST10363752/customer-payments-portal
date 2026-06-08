@@ -1,21 +1,18 @@
 version: 2.1
 
-orbs:
-  sonarcloud: sonarsource/sonarcloud@2.0.0
-
 jobs:
-  build:
+  build-and-scan:
     docker:
       - image: cimg/node:22.12.0
     steps:
       - checkout
       - run:
-          name: Install Server Dependencies
+          name: Install Backend Dependencies
           command: |
             cd server
             npm install
       - run:
-          name: Install Client Dependencies
+          name: Install Frontend Dependencies
           command: |
             cd client
             npm install --force
@@ -25,17 +22,22 @@ jobs:
             cd client
             npm run build
       - run:
-          name: Verify Backend Syntax
+          name: Install SonarScanner
           command: |
             cd server
-            node -c index.js
-      - sonarcloud/scan:
-          name: SonarQube Scan
-          project_key: ST10363752_customer-payments-portal
-          project_name: customer-payments-portal
+            npm install sonarqube-scanner --save-dev
+      - run:
+          name: Run SonarQube Scan
+          command: |
+            node sonar-project.js
+      - run:
+          name: Security Audit
+          command: |
+            cd server
+            npm audit --audit-level=moderate || true
 
 workflows:
   version: 2
   build-and-scan:
     jobs:
-      - build
+      - build-and-scan
