@@ -22,15 +22,12 @@ jobs:
             cd client
             npm run build
       - run:
-          name: Download SonarScanner CLI
+          name: Install SonarScanner via npm
           command: |
-            wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux.zip
-            unzip sonar-scanner-cli-6.2.1.4610-linux.zip
-            export PATH=$PATH:$PWD/sonar-scanner-6.2.1.4610-linux/bin
+            npm install -g sonar-scanner
       - run:
           name: Run SonarQube Scan
           command: |
-            export PATH=$PATH:$PWD/sonar-scanner-6.2.1.4610-linux/bin
             sonar-scanner \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.login=$SONAR_TOKEN \
