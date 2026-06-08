@@ -22,18 +22,20 @@ jobs:
             cd client
             npm run build
       - run:
-          name: Install SonarScanner via npm
+          name: Install sonarqube-scanner locally
           command: |
-            npm install -g sonar-scanner
+            cd server
+            npm install sonarqube-scanner --save-dev
       - run:
           name: Run SonarQube Scan
           command: |
-            sonar-scanner \
+            cd server
+            npx sonarqube-scanner \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.login=$SONAR_TOKEN \
               -Dsonar.projectKey=ST10363752_customer-payments-portal \
               -Dsonar.projectName=customer-payments-portal \
-              -Dsonar.sources=server \
+              -Dsonar.sources=. \
               -Dsonar.exclusions=**/node_modules/**
       - run:
           name: Security Audit
