@@ -6,43 +6,45 @@ jobs:
       - image: cimg/node:22.12.0
     steps:
       - checkout
+      
+      # Install dependencies
       - run:
           name: Install Backend Dependencies
           command: |
             cd server
             npm install
+      
       - run:
           name: Install Frontend Dependencies
           command: |
             cd client
             npm install --force
+      
       - run:
           name: Build Frontend
           command: |
             cd client
             npm run build
+      
+      # Install SonarQube Scanner (THIS IS THE KEY STEP)
       - run:
-          name: Verify Backend Syntax
+          name: Install SonarQube Scanner
           command: |
-            cd server
-            node -c index.js
+            wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+            unzip sonar-scanner-cli-5.0.1.3006-linux.zip
+            sudo mv sonar-scanner-5.0.1.3006-linux /opt/sonar-scanner
+            echo 'export PATH=$PATH:/opt/sonar-scanner/bin' >> $BASH_ENV
+            source $BASH_ENV
+      
+      # Run SonarQube Analysis
       - run:
-          name: Security Audit
+          name: SonarQube Analysis
           command: |
-            cd server
-            npm audit --audit-level=moderate || true
-            cd ../client
-            npm audit --audit-level=moderate || true
-      - run:
-          name: SonarQube Scan (npm version)
-          command: |
-            cd server
-            npx sonarqube-scanner \
+            sonar-scanner \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.login=$SONAR_TOKEN \
               -Dsonar.projectKey=ST10363752_customer-payments-portal \
-              -Dsonar.projectName=customer-payments-portal \
-              -Dsonar.sources=. \
+              -Dsonar.sources=server \
               -Dsonar.exclusions=**/node_modules/**
 
 workflows:
