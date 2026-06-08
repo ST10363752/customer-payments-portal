@@ -1,4 +1,3 @@
-// server/index.js - Employee Portal (NO REGISTRATION) - FULL CORRECTED VERSION
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -9,7 +8,6 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
-const path = require('path');
 
 const app = express();
 
@@ -20,20 +18,16 @@ app.use(helmet());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
-    'http://localhost:5000',
     'https://tangerine-cranachan-d3bf75.netlify.app'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) !== -1) {
             return callback(null, true);
-        } else {
-            console.log('Blocked origin:', origin);
-            return callback(new Error('Not allowed by CORS'), false);
         }
+        return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -43,27 +37,18 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// ========== RATE LIMITING (Brute Force Protection) ==========
+// ========== RATE LIMITING ==========
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts only
-    message: 'Too many login attempts. Please try again in 15 minutes.',
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-// General rate limiter for all API requests
-const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: 'Too many requests. Please try again later.',
+    max: 5,
+    message: 'Too many login attempts. Try again in 15 minutes.',
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-// ========== REGEX WHITELISTING PATTERNS ==========
+// ========== REGEX PATTERNS ==========
 const patterns = {
-    employeeId: /^EMP[0-9]{3}$/,  // EMP001, EMP002, etc.
+    employeeId: /^EMP[0-9]{3}$/,
     fullName: /^[A-Za-z\s'-]{2,50}$/,
     password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
     amount: /^[0-9]+(\.[0-9]{1,2})?$/,
@@ -78,7 +63,7 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('✅ MongoDB connected successfully'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// ========== EMPLOYEE SCHEMA (NO REGISTRATION - Pre-created employees only) ==========
+// ========== SCHEMAS ==========
 const employeeSchema = new mongoose.Schema({
     fullName: { type: String, required: true },
     employeeId: { type: String, required: true, unique: true },
@@ -126,22 +111,15 @@ const verifyToken = (req, res, next) => {
         req.role = decoded.role;
         next();
     } catch (error) {
-        return res.status(401).json({ error: 'Invalid or expired session. Please login again.' });
+        return res.status(401).json({ error: 'Invalid or expired session.' });
     }
 };
 
-const verifyAdmin = (req, res, next) => {
-    if (req.role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
-    }
-    next();
-};
-
-// ========== EMPLOYEE LOGIN API (NO REGISTRATION) ==========
+// ========== LOGIN API ==========
 app.post('/api/login',
     loginLimiter,
-    body('employeeId').matches(patterns.employeeId).withMessage('Invalid Employee ID format (e.g., EMP001)'),
-    body('password').notEmpty().withMessage('Password is required'),
+    body('employeeId').matches(patterns.employeeId),
+    body('password').notEmpty(),
     async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -184,18 +162,14 @@ app.post('/api/login',
             });
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Login failed. Please try again.' });
+            res.status(500).json({ error: 'Login failed.' });
         }
     }
 );
 
 // ========== LOGOUT API ==========
 app.post('/api/logout', (req, res) => {
-    res.clearCookie('token', {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none'
-    });
+    res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'none' });
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -203,37 +177,32 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/me', verifyToken, async (req, res) => {
     try {
         const employee = await Employee.findOne({ employeeId: req.employeeId }).select('-password');
-        if (!employee) {
-            return res.status(404).json({ error: 'Employee not found' });
-        }
+        if (!employee) return res.status(404).json({ error: 'Employee not found' });
         res.json({ employee });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 });
 
-// ========== GET EMPLOYEE BALANCE ==========
+// ========== GET BALANCE ==========
 app.get('/api/balance', verifyToken, async (req, res) => {
     try {
         const employee = await Employee.findOne({ employeeId: req.employeeId }).select('balance employeeId');
-        if (!employee) {
-            return res.status(404).json({ error: 'Employee not found' });
-        }
         res.json({ balance: employee.balance, employeeId: employee.employeeId });
     } catch (error) {
         res.status(500).json({ error: 'Could not fetch balance' });
     }
 });
 
-// ========== INTERNATIONAL PAYMENT API ==========
+// ========== MAKE PAYMENT ==========
 app.post('/api/payment',
     verifyToken,
-    body('recipientName').matches(/^[A-Za-z\s'-]{2,100}$/).withMessage('Invalid recipient name'),
-    body('recipientAccount').matches(/^[0-9]{6,15}$/).withMessage('Invalid recipient account number'),
-    body('recipientBank').matches(/^[A-Za-z\s]{2,100}$/).withMessage('Invalid bank name'),
-    body('swiftCode').matches(patterns.swiftCode).withMessage('Invalid SWIFT/BIC code'),
-    body('amount').matches(patterns.amount).withMessage('Invalid amount format'),
-    body('currency').matches(patterns.currency).withMessage('Invalid currency code (3 letters)'),
+    body('recipientName').matches(/^[A-Za-z\s'-]{2,100}$/),
+    body('recipientAccount').matches(/^[0-9]{6,15}$/),
+    body('recipientBank').matches(/^[A-Za-z\s]{2,100}$/),
+    body('swiftCode').matches(patterns.swiftCode),
+    body('amount').matches(patterns.amount),
+    body('currency').matches(patterns.currency),
     async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -246,13 +215,8 @@ app.post('/api/payment',
         try {
             const employee = await Employee.findOne({ employeeId: req.employeeId });
             
-            if (!employee) {
-                return res.status(404).json({ error: 'Employee not found' });
-            }
-            
-            if (employee.balance < paymentAmount) {
-                return res.status(400).json({ error: 'Insufficient balance' });
-            }
+            if (!employee) return res.status(404).json({ error: 'Employee not found' });
+            if (employee.balance < paymentAmount) return res.status(400).json({ error: 'Insufficient balance' });
             
             employee.balance -= paymentAmount;
             await employee.save();
@@ -273,19 +237,14 @@ app.post('/api/payment',
             
             res.json({
                 success: true,
-                message: 'International payment processed successfully!',
+                message: 'Payment processed successfully!',
                 transactionId: payment._id,
                 newBalance: employee.balance,
-                payment: {
-                    amount: paymentAmount,
-                    currency,
-                    recipient: recipientName,
-                    date: payment.createdAt
-                }
+                payment: { amount: paymentAmount, currency, recipient: recipientName, date: payment.createdAt }
             });
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Payment failed. Please try again.' });
+            res.status(500).json({ error: 'Payment failed.' });
         }
     }
 );
@@ -300,16 +259,6 @@ app.get('/api/payments', verifyToken, async (req, res) => {
     }
 });
 
-// ========== ADMIN ONLY: GET ALL EMPLOYEES ==========
-app.get('/api/employees', verifyToken, verifyAdmin, async (req, res) => {
-    try {
-        const employees = await Employee.find({}).select('-password');
-        res.json({ employees });
-    } catch (error) {
-        res.status(500).json({ error: 'Could not fetch employees' });
-    }
-});
-
 // ========== HEALTH CHECK ==========
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -318,10 +267,7 @@ app.get('/api/health', (req, res) => {
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 Employee Portal Server running on http://localhost:${PORT}`);
-    console.log(`📡 API available at http://localhost:${PORT}/api/health`);
-    console.log(`🔐 Employee login: EMP001, EMP002, EMP003`);
+    console.log(`🚀 Employee Portal running on http://localhost:${PORT}`);
+    console.log(`📡 API: http://localhost:${PORT}/api/health`);
+    console.log(`🔐 Login with: EMP001 / Employee@123`);
 });
-
-// Export for testing (optional)
-module.exports = app;

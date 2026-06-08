@@ -5,6 +5,8 @@ jobs:
     docker:
       - image: cimg/node:22.12.0
     steps:
+      - setup_remote_docker:
+          version: 24.0.2
       - checkout
       - run:
           name: Install Backend Dependencies
@@ -22,26 +24,29 @@ jobs:
             cd client
             npm run build
       - run:
-          name: Install sonarqube-scanner locally
+          name: Verify Backend Syntax
           command: |
             cd server
-            npm install sonarqube-scanner --save-dev
-      - run:
-          name: Run SonarQube Scan
-          command: |
-            cd server
-            npx sonarqube-scanner \
-              -Dsonar.host.url=https://sonarcloud.io \
-              -Dsonar.login=$SONAR_TOKEN \
-              -Dsonar.projectKey=ST10363752_customer-payments-portal \
-              -Dsonar.projectName=customer-payments-portal \
-              -Dsonar.sources=. \
-              -Dsonar.exclusions=**/node_modules/**
+            node -c index.js
       - run:
           name: Security Audit
           command: |
             cd server
             npm audit --audit-level=moderate || true
+            cd ../client
+            npm audit --audit-level=moderate || true
+      - run:
+          name: SonarQube Scan
+          command: |
+            docker run --rm \
+              -e SONAR_HOST_URL="https://sonarcloud.io" \
+              -e SONAR_TOKEN="$SONAR_TOKEN" \
+              -v "$(pwd):/usr/src" \
+              sonarsource/sonar-scanner-cli:latest \
+              -Dsonar.projectKey=ST10363752_customer-payments-portal \
+              -Dsonar.projectName="customer-payments-portal" \
+              -Dsonar.sources=server,client/src \
+              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**"
 
 workflows:
   version: 2

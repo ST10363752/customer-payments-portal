@@ -3,7 +3,6 @@ import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import MakePayment from './MakePayment';
 import PaymentHistory from './PaymentHistory';
-import './Portal.css';
 
 const Portal = ({ user, onLogout }) => {
   const navigate = useNavigate();

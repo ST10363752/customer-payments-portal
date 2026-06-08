@@ -1,9 +1,7 @@
-// server/seedEmployees.js
 require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
-// Employee data - these are your static employees (no registration needed)
 const employees = [
     {
         fullName: 'Landile Fakazi',
@@ -30,28 +28,25 @@ const employees = [
 
 async function seedEmployees() {
     try {
-        // Connect to MongoDB
         const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/portal_db';
         await mongoose.connect(MONGODB_URI);
         console.log('✅ Connected to MongoDB');
 
-        // Define Employee Schema
         const employeeSchema = new mongoose.Schema({
-            fullName: { type: String, required: true },
-            employeeId: { type: String, required: true, unique: true },
-            password: { type: String, required: true },
-            role: { type: String, default: 'employee' },
-            department: { type: String },
+            fullName: String,
+            employeeId: { type: String, unique: true },
+            password: String,
+            role: String,
+            department: String,
+            balance: { type: Number, default: 50000 },
             createdAt: { type: Date, default: Date.now }
         });
 
         const Employee = mongoose.model('Employee', employeeSchema);
 
-        // Clear existing employees (optional - comment out if you want to keep)
         await Employee.deleteMany({});
         console.log('🗑️ Cleared existing employees');
 
-        // Insert employees
         for (const emp of employees) {
             const hashedPassword = await bcrypt.hash(emp.password, 12);
             const employee = new Employee({
@@ -68,7 +63,7 @@ async function seedEmployees() {
         console.log('🎉 All employees seeded successfully!');
         process.exit(0);
     } catch (error) {
-        console.error('❌ Error seeding employees:', error);
+        console.error('❌ Error:', error);
         process.exit(1);
     }
 }

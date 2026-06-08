@@ -31,9 +31,7 @@ const Login = ({ onLogin }) => {
     <div className="form-container">
       <div className="form-card">
         <h2>Employee Portal</h2>
-        <p style={{ textAlign: 'center', marginBottom: '30px', color: '#666' }}>
-          Secure International Payments Portal
-        </p>
+        <p>Secure International Payments Portal</p>
         
         {error && <div className="error-message">{error}</div>}
         
@@ -44,10 +42,10 @@ const Login = ({ onLogin }) => {
               type="text"
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
-              placeholder="e.g., EMP001"
+              placeholder="EMP001, EMP002, or EMP003"
               required
             />
-            <small style={{ color: '#666', fontSize: '12px' }}>Format: EMP001, EMP002, or EMP003</small>
+            <small>Format: EMP001, EMP002, or EMP003</small>
           </div>
           
           <div className="form-group">
@@ -66,12 +64,9 @@ const Login = ({ onLogin }) => {
           </button>
         </form>
         
-        <div className="form-footer" style={{ textAlign: 'center', marginTop: '20px' }}>
-          <p style={{ fontSize: '12px', color: '#999' }}>
-            This is an employee-only portal. No registration available.
-            <br />
-            Contact your administrator for credentials.
-          </p>
+        <div className="form-footer">
+          <p>Employee IDs: EMP001, EMP002, EMP003</p>
+          <p>Contact administrator for credentials</p>
         </div>
       </div>
     </div>
