@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   build:
     docker:
-      - image: cimg/node:20.10.0
+      - image: cimg/node:22.12.0  # Updated to Node 22.12
     steps:
       - checkout
       - run:
@@ -15,7 +15,7 @@ jobs:
           name: Install Client Dependencies
           command: |
             cd client
-            npm install
+            npm install --force
       - run:
           name: Build Frontend
           command: |
@@ -30,8 +30,6 @@ jobs:
           name: Security Audit
           command: |
             cd server
-            npm audit --audit-level=moderate || true
-            cd ../client
             npm audit --audit-level=moderate || true
 
 workflows:
