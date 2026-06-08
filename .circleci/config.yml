@@ -1,9 +1,12 @@
 version: 2.1
 
+orbs:
+  sonarcloud: sonarsource/sonarcloud@2.0.0
+
 jobs:
   build:
     docker:
-      - image: cimg/node:22.12.0  # Updated to Node 22.12
+      - image: cimg/node:22.12.0
     steps:
       - checkout
       - run:
@@ -26,11 +29,10 @@ jobs:
           command: |
             cd server
             node -c index.js
-      - run:
-          name: Security Audit
-          command: |
-            cd server
-            npm audit --audit-level=moderate || true
+      - sonarcloud/scan:
+          name: SonarQube Scan
+          project_key: ST10363752_customer-payments-portal
+          project_name: customer-payments-portal
 
 workflows:
   version: 2
