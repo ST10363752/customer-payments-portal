@@ -14,20 +14,27 @@ const app = express();
 // ========== SECURITY MIDDLEWARE ==========
 app.use(helmet());
 
-// ========== CORS CONFIGURATION ==========
+// ========== CORS CONFIGURATION - UPDATED FOR ALL NETLIFY URLS ==========
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
-    'https://tangerine-cranachan-d3bf75.netlify.app'
+    'http://localhost:5000',
+    'https://tangerine-cranachan-d3bf75.netlify.app',
+    'https://stupendous-twilight-3696b4.netlify.app',
+    'https://classy-cactus-b989db.netlify.app',
+    'https://mellow-condol-2fb19d.netlify.app'
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) !== -1) {
             return callback(null, true);
+        } else {
+            console.log('Blocked origin:', origin);
+            return callback(new Error('Not allowed by CORS'), false);
         }
-        return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -188,6 +195,7 @@ app.get('/api/me', verifyToken, async (req, res) => {
 app.get('/api/balance', verifyToken, async (req, res) => {
     try {
         const employee = await Employee.findOne({ employeeId: req.employeeId }).select('balance employeeId');
+        if (!employee) return res.status(404).json({ error: 'Employee not found' });
         res.json({ balance: employee.balance, employeeId: employee.employeeId });
     } catch (error) {
         res.status(500).json({ error: 'Could not fetch balance' });
